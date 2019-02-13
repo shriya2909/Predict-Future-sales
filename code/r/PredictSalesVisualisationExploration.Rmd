@@ -1,0 +1,194 @@
+---
+title: "Predict Future Sales"
+author: "Shriya Rai"
+date: "30 November 2018"
+output:
+  word_document: default
+  pdf_document: default
+---
+-> Loading libraries and data 
+```{r}
+#Loading libraries to be used 
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+
+#input data files
+sales_data = read.csv("C:/Users/Shriya/Desktop/Predict sales/sales_train_v2.csv")
+test_data = read.csv("C:/Users/Shriya/Desktop/Predict sales/test.csv")
+item_data = read.csv("C:/Users/Shriya/Desktop/Predict sales/items.csv")
+shops_data = read.csv("C:/Users/Shriya/Desktop/Predict sales/shops.csv")
+item_cat_data = read.csv("C:/Users/Shriya/Desktop/Predict sales/item_categories.csv")
+
+# Joining item data ans shop data with sales data
+sales_data %>% left_join(item_data, by='item_id') %>%  left_join(shops_data, by='shop_id') -> sales_data
+sales_data %>% left_join(item_cat_data, by='item_category_id') -> sales_data
+
+#Dividing date into subdivisions using lubridate library
+sales_data$date = as.Date(sales_data$date, "%d.%m.%Y")
+sales_data$year = year(sales_data$date)
+sales_data$month = month(sales_data$date)
+sales_data$day = day(sales_data$date)
+sales_data$weekdays =  weekdays(sales_data$date)
+
+#Turning above date columns into factors 
+sales_data$year =  as.factor(sales_data$year)
+sales_data$month = as.factor(sales_data$month)
+sales_data$day = as.factor(sales_data$day)
+sales_data$weekdays = as.factor(sales_data$weekdays)
+
+#Factorising for each item category 
+sales_data$item_category_id =  as.factor(sales_data$item_category_id)
+
+```
+
+-> Sales distribution across different shops
+
+```{r}
+#Sales distribution across different shops
+sales_per_shop = sales_data %>%
+    select(shop_id, item_cnt_day) %>%
+    group_by(shop_id) %>%
+    summarise(item_cnt_day =  sum(item_cnt_day, na.rm = T))
+
+sales_per_shop
+
+ggplot(data =  sales_per_shop, 
+       mapping = aes(x = reorder(shop_id, item_cnt_day), 
+                     y = item_cnt_day, 
+                     fill = factor(shop_id))) +
+    geom_histogram(stat = "identity") +
+    coord_flip() +
+    xlab("Shop ID") + ylab("Number of items sold")+
+    ggtitle(label = "Sales distribution across shops")
+ 
+ggsave("shopwise.png" ,width = 10, height = 7)#Saving plot to pc
+
+# 20 Most popular shops 
+sales_data %>% group_by(shop_id) %>% summarise(Quantity_sold=sum(item_cnt_day)) %>%   ungroup() %>%
+  arrange(desc(Quantity_sold)) %>% head(20) -> popular_shop
+
+popular_shop
+```
+
+-> Sales distribution across different categories
+```{r}
+#Sales distribution across different categories
+sales_per_category = sales_data %>%
+    select(item_category_id, item_cnt_day) %>%
+    group_by(item_category_id) %>%
+    summarise(item_cnt_day =  sum(item_cnt_day, na.rm = T))
+
+ggplot(data =  sales_per_category, 
+       mapping = aes(x = reorder(item_category_id,item_cnt_day), 
+                     y = item_cnt_day,
+                     fill = factor(item_category_id))) +
+    geom_histogram(stat = "identity") +
+    xlab("Item Category") + ylab("Number of items sold") +
+    ggtitle("Sales distribution across categories")+coord_flip()
+
+ggsave("categorywise.png" ,width = 14, height = 7)#Saving plot to pc
+
+# 20 Most popular item categories  
+sales_data %>% group_by(item_category_id) %>%  summarise(Quantity_sold=sum(item_cnt_day)) %>%   ungroup() %>%
+  arrange(desc(Quantity_sold)) %>% head(20) -> popular_cat
+
+popular_cat
+```
+
+->Sales distribution across time period
+```{r}
+#Sales distribution across Time periods
+
+
+# Sale distribution every day for each month
+month_daywise_total_sales =  sales_data %>%
+    group_by(month, day) %>%
+    summarise(total_sales =  sum(item_price * item_cnt_day))
+
+ggplot(month_daywise_total_sales, 
+       aes(x = day, y = total_sales, group =  month, color =  factor(month))) +
+    geom_line() + geom_point() +
+    labs(title = "Sale distribution per day for each month", x = "Days", y = "Sales", fill = "Months") 
+
+ggsave("everydayofeachmonth.png",width = 14, height = 7)#Saving plot to pc
+
+#Sale distribution per year
+yearly_sales = sales_data %>%
+    group_by(year) %>%
+    summarise(yearly_sale = sum(item_price * item_cnt_day))
+
+ggplot(yearly_sales, aes(x =  year, y = yearly_sale, fill =  factor(year)))+
+    geom_histogram(stat = "identity")+
+    labs(title = "Sale distribution per year", x = "Year", y = "Sales", fill = "Year")
+
+ggsave("foryear.png",width = 10, height = 7) #Saving plot to pc
+
+# Sale distribution per month for each year 
+year_monthwise_sales = sales_data %>%
+    group_by(year, month) %>%
+    summarise(ym_sale = sum(item_price*item_cnt_day)) %>%
+    arrange(year)
+
+ggplot(year_monthwise_sales, aes(x =  month, y = ym_sale, fill =  factor(year)))+
+    geom_histogram(stat = "identity", position = "dodge") +
+    labs(title = "Sale distribution per month for each year ", x = "Months", y =  "Total sales", fill = "Year")
+
+
+ggsave("permonthforyear.png",width = 10, height = 7) #Saving plot to pc
+
+#  Sale distribution for each day of the week
+weekdays_sales = sales_data %>%
+    group_by(weekdays) %>%
+    summarise(total_sale = sum(item_cnt_day * item_price)) %>%
+    arrange(desc(total_sale))
+
+ggplot(weekdays_sales, aes(x =reorder(weekdays, total_sale), y =  total_sale, fill = weekdays))+
+    geom_bar(stat = "identity") +
+    labs(title = " Sale distribution for each day of the week", x = "Week Days", y =  "Sales", fill = "Week Days") +
+    coord_flip()
+
+ggsave("forday.png",width = 10, height = 7) #Saving plot to pc
+
+#Popularity shift over the years 
+sales_data %>% 
+  group_by(year,item_id) %>% 
+  summarise(Quantity_sold=sum(item_cnt_day)) %>% filter(Quantity_sold == max(Quantity_sold)) %>% arrange(desc(Quantity_sold)) %>%
+  ungroup()  -> Most_Pop
+
+Most_Pop
+
+ggplot(Most_Pop, aes(x = year, y = Quantity_sold, fill=item_id)) + 
+  geom_bar(stat = "identity") +
+  labs(title = "Most Popular Product per year", x= "Years", y = "# of most popular item sold", fill = "Item ID") +
+  coord_flip() 
+
+ggsave("mostpop.png",width = 10, height = 7) #Saving plot to pc
+
+
+Most_Pop_2015 <- head(sales_data %>%  filter(year=="2015") %>% group_by(item_id,year) %>% summarise(num = n()) %>% arrange(desc(num)),5)
+
+Most_Pop_2014 <- head(sales_data %>%  filter(year=="2014") %>% group_by(item_id,year) %>% summarise(num = n()) %>% arrange(desc(num)),5)
+
+Most_Pop_2013 <- head(sales_data%>%  filter(year=="2013") %>% group_by(item_id,year) %>% summarise(num = n()) %>% arrange(desc(num)),5)
+
+Most_Pop_comb <- rbind(Most_Pop_2015,Most_Pop_2014)   # combining most popular items for 2015 and 2014
+Most_Pop_comb <- rbind(Most_Pop_comb,Most_Pop_2013)  # combining most popular items for (2014,2015) with  2013
+
+Most_Pop_comb
+
+ggplot(data = Most_Pop_comb) +
+  aes(x= reorder(item_id,-num),y=num,fill=year) +
+  geom_bar(width = 1, stat = "identity") +
+  facet_grid(~year) +
+  labs(title = "5 Most popular products over the years",
+       fill="Year", x="Item ID",y="# of Transactions") 
+
+
+ggsave("5mostpop.png",width = 14, height = 7) #Saving plot to pc
+
+
+
+```
+
+

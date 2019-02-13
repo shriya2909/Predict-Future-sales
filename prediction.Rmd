@@ -1,0 +1,163 @@
+---
+title: "Prediction-fatemeh nosrat"
+author: "Fatemeh Nosrat"
+date: "12/13/2018"
+output: html_document
+---
+
+```{r}
+---
+title: "Project2"
+author: "Fatemeh Nosrat"
+date: "12/12/2018"
+output:
+  word_document: default
+  html_document: default
+  pdf_document: default
+---
+
+```{r}
+#data in item_categories.csv
+item_categories <- read.csv(file="/Users/fatemehnosrat/Desktop/Applied Regression/all-2/item_categories.csv",header = TRUE, na.strings=c("",".","NA"))
+
+# a summary of item_categories
+summary(item_categories)
+
+# data in saless_train.csv
+sales_train <- read.csv(file="/Users/fatemehnosrat/Desktop/Applied Regression/all-2/sales_train.csv",header = TRUE, na.strings=c("",".","NA"))
+
+# a summary of sales_train
+summary(sales_train)
+
+#data in shops.csv
+shops <- read.csv(file="/Users/fatemehnosrat/Desktop/Applied Regression/all-2/shops.csv",header = TRUE, na.strings=c("",".","NA"))
+
+# a summary of shops.csv
+summary(shops)
+ 
+#data in items.csv
+items <- read.csv(file="/Users/fatemehnosrat/Desktop/Applied Regression/all-2/items.csv",header = TRUE, na.strings=c("",".","NA"))
+
+# a summary od shops
+summary(items)
+#data in test.csv
+test <- read.csv(file="/Users/fatemehnosrat/Desktop/Applied Regression/all-2/test.csv",header = TRUE, na.strings=c("",".","NA"))
+
+# a summary of test.csv
+summary(test)
+
+# loading plyr library, we need plyr to use "join"
+library(plyr)
+
+ #join 2 data frames (sales_train and items) by their common column (item_id) 
+combined_data <- join (x = test, y = sales_train, by = c("item_id"))
+
+head(combined_data)
+
+# a summary of combined_data
+summary(combined_data)
+
+# load lubricate, we need this to work with "time and date"
+library(lubricate)
+#column date in combined_data
+combined_data$date <-dmy(combined_data$date)
+
+#column year in combined_data
+combined_data$year<-year(combined_data$date)
+
+#column month in combined_data
+combined_data$month<-month(combined_data$date)
+
+#column day in combined_data
+combined_data$day<-month(combined_data$day)
+
+#column weekday in combined_data
+combined_data$weekday<-weekdays(combined_data$date)
+
+#convert column year in combined_data to a factor
+combined_data$year <- as.factor(combined_data$year)
+
+# convert column month in combined_data  to a factor
+combined_data$month <- as.factor(combined_data$month)
+
+#convert column weekday in combined_data to a factor
+combined_data$weekday <- as.factor(combined_data$weekday)
+
+#convert column shop_id to a factor 
+combined_data$shop_id <- as.factor(combined_data$shop_id)
+
+#convert column item_id to a factor
+combined_data$item_id <- as.factor(combined_data$item_id)
+
+#convert item_category_id to a factor
+combined_data$item_category_id <- as.factor(combined_data$item_category_id)
+
+##Explanation of aggregate:
+#The process involves two stages. First, collate individual cases of raw data together with a grouping variable.
+#Second, perform which calculation you want on each group of cases. These two stages are wrapped into a single function.
+
+#calculating the total items by month
+aggregate(item_cnt_day~month, combined_data, sum)
+
+#loading data.table for creating a data table
+
+library(data.table) 
+
+#use function as.dara.table for combining data
+train_datatable = as.data.table(combined_data)
+
+summarized_month_shop_item = train_datatable[, list(item_cnt_month=(sum(item_cnt_day))/12), by = c("date_block_num", "month","shop_id", "item_category_id", "item_id", "item_price")]
+
+# a summary of summarized_month_shop_item
+summary(summarized_month_shop_item)
+
+head(summarized_month_shop_item)
+
+
+library(MASS)
+
+#2 is added to avoid negative values for log transformation, it will be subtracted later
+summarized_month_shop_item$item_cnt_month <- summarized_month_shop_item$item_cnt_month + 2
+
+#log transformed linear regression model
+sales_model = lm(formula = log(item_cnt_month) ~ date_block_num + month + shop_id + item_category_id, data = summarized_month_shop_item)
+
+#summary of sales_model
+summary(sales_model)
+
+#Assign 11 to month for November
+test$month <- 11
+
+#convert month to a factor
+test$month <- as.factor(test$month)
+test$shop_id <- as.factor(test$shop_id)
+
+#Assign 34 to date_block_num for Nov 2015
+test$date_block_num <- 34
+head(test)
+
+
+```
+
+
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
